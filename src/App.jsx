@@ -35,6 +35,7 @@ export default function App() {
   const [form, setForm] = useState(emptyForm);
   const [filter, setFilter] = useState('Semua');
   const [search, setSearch] = useState('');
+  const [lastSync, setLastSync] = useState('');
   const [status, setStatus] = useState(
     hasFirebaseEnv ? 'Firebase aktif. Data transaksi tersinkron realtime.' : 'Mode demo aktif. Hubungkan Firebase untuk sinkronisasi realtime.',
   );
@@ -62,6 +63,13 @@ export default function App() {
       });
 
       setTransactions(remoteTransactions);
+      setLastSync(
+        new Intl.DateTimeFormat('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }).format(new Date()),
+      );
     });
 
     return () => unsubscribe();
@@ -175,6 +183,15 @@ export default function App() {
             <span>Realtime Ready</span>
             <span>Firebase Ready</span>
             <span>GitHub Deployable</span>
+          </div>
+          <div className="sync-banner">
+            <strong>{hasFirebaseEnv ? 'Sinkron lintas perangkat aktif' : 'Sinkron lintas perangkat belum aktif'}</strong>
+            <span>
+              {hasFirebaseEnv
+                ? 'Perubahan pemasukan dan pengeluaran di laptop atau HP lain akan muncul dari Firebase yang sama.'
+                : 'Isi Firebase agar data di laptop dan HP lain tetap sama.'}
+            </span>
+            {lastSync ? <small>Sinkron terakhir {lastSync}</small> : null}
           </div>
         </div>
 
@@ -364,6 +381,28 @@ export default function App() {
                 ))}
               </tbody>
             </table>
+
+            <div className="mobile-transactions">
+              {filteredTransactions.map((item) => (
+                <article key={`mobile-${item.id}`} className="mobile-transaction-card">
+                  <div className="mobile-transaction-card__top">
+                    <span className={`type-pill ${item.type === 'Pemasukan' ? 'type-pill--income' : 'type-pill--expense'}`}>
+                      {item.type}
+                    </span>
+                    <strong>{formatCurrency(item.amount)}</strong>
+                  </div>
+                  <h3>{item.category}</h3>
+                  <p>{item.note}</p>
+                  <div className="mobile-transaction-card__meta">
+                    <span>{formatDate(item.date)}</span>
+                    <span>{item.source}</span>
+                  </div>
+                  <button type="button" className="table-action mobile-transaction-card__action" onClick={() => handleDelete(item.id)}>
+                    Hapus
+                  </button>
+                </article>
+              ))}
+            </div>
 
             {filteredTransactions.length === 0 ? (
               <div className="empty-state">
