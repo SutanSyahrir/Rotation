@@ -66,6 +66,7 @@ Pilihan paling cepat:
 
 1. Vercel atau Netlify untuk hosting frontend.
 2. Firebase Hosting bila ingin satu ekosistem dengan Firestore.
+3. GitHub Pages untuk deploy otomatis dari repository.
 
 Untuk build produksi:
 
@@ -89,3 +90,11 @@ Perintah deploy:
 ```bash
 npx firebase-tools deploy --only hosting
 ```
+
+## Deploy ke GitHub Pages
+
+Workflow GitHub Pages sudah disiapkan di:
+
+- `.github/workflows/deploy-pages.yml`
+
+Jika GitHub Pages diaktifkan pada repository, setiap push ke branch `main` akan membangun dan mem-publish website otomatis.
