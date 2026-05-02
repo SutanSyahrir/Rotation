@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { db, hasFirebaseEnv } from './firebase';
+import { ACCESS_SESSION_KEY, verifyAccess } from './access';
 
 const currency = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -16,6 +17,11 @@ const emptyForm = {
   amount: '',
   date: today,
   note: '',
+};
+
+const emptyAccessForm = {
+  name: '',
+  password: '',
 };
 
 function formatCurrency(value) {
@@ -45,12 +51,34 @@ function formatDate(dateString) {
 export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [accessForm, setAccessForm] = useState(emptyAccessForm);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeUser, setActiveUser] = useState('');
+  const [accessError, setAccessError] = useState('');
   const [filter, setFilter] = useState('Semua');
   const [search, setSearch] = useState('');
   const [lastSync, setLastSync] = useState('');
   const [status, setStatus] = useState(
     hasFirebaseEnv ? 'Firebase aktif. Data transaksi tersinkron realtime.' : 'Mode demo aktif. Hubungkan Firebase untuk sinkronisasi realtime.',
   );
+
+  useEffect(() => {
+    const savedSession = window.localStorage.getItem(ACCESS_SESSION_KEY);
+
+    if (!savedSession) {
+      return;
+    }
+
+    try {
+      const session = JSON.parse(savedSession);
+      if (session?.name) {
+        setIsAuthenticated(true);
+        setActiveUser(session.name);
+      }
+    } catch {
+      window.localStorage.removeItem(ACCESS_SESSION_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasFirebaseEnv || !db) {
@@ -181,6 +209,77 @@ export default function App() {
     setStatus('Semua transaksi lokal dihapus. Saldo kembali Rp0.');
   }
 
+  async function handleAccessSubmit(event) {
+    event.preventDefault();
+
+    const isValid = await verifyAccess(accessForm.name, accessForm.password);
+
+    if (!isValid) {
+      setAccessError('Nama atau password tidak cocok.');
+      return;
+    }
+
+    const session = {
+      name: accessForm.name.trim().toLowerCase(),
+      loggedAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(ACCESS_SESSION_KEY, JSON.stringify(session));
+    setIsAuthenticated(true);
+    setActiveUser(session.name);
+    setAccessError('');
+    setAccessForm(emptyAccessForm);
+  }
+
+  function handleLogout() {
+    window.localStorage.removeItem(ACCESS_SESSION_KEY);
+    setIsAuthenticated(false);
+    setActiveUser('');
+    setAccessForm(emptyAccessForm);
+    setAccessError('');
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="auth-shell">
+        <section className="auth-card">
+          <span className="eyebrow">Akses Rotation</span>
+          <h1>Masuk dulu sebelum membuka dashboard kas.</h1>
+          <p>
+            Sistem kas dan Firebase tetap sama. Halaman ini hanya menambah pembatas nama
+            dan password supaya aksesnya lebih terbatas.
+          </p>
+
+          <form className="auth-form" onSubmit={handleAccessSubmit}>
+            <label>
+              Nama
+              <input
+                type="text"
+                placeholder="Masukkan nama akses"
+                value={accessForm.name}
+                onChange={(event) => setAccessForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </label>
+
+            <label>
+              Password
+              <input
+                type="password"
+                placeholder="Masukkan password"
+                value={accessForm.password}
+                onChange={(event) => setAccessForm((current) => ({ ...current, password: event.target.value }))}
+              />
+            </label>
+
+            {accessError ? <div className="auth-error">{accessError}</div> : null}
+
+            <button type="submit">Masuk ke Dashboard</button>
+          </form>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="hero">
@@ -204,6 +303,7 @@ export default function App() {
                 : 'Isi Firebase agar data di laptop dan HP lain tetap sama.'}
             </span>
             {lastSync ? <small>Sinkron terakhir {lastSync}</small> : null}
+            <small>Akses masuk sebagai {activeUser}</small>
           </div>
         </div>
 
@@ -212,6 +312,9 @@ export default function App() {
             <span>Saldo Saat Ini</span>
             <strong>{formatCurrency(summary.balance)}</strong>
           </div>
+          <button type="button" className="logout-button" onClick={handleLogout}>
+            Keluar
+          </button>
           <div className="hero__mini-grid">
             <article>
               <label>Pemasukan</label>
